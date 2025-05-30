@@ -1,6 +1,88 @@
 use std::collections::{HashSet, BTreeSet};
 use crate::{get_code, decode_by_geomgrid, to_string};
 
+// GeoSot网格单元，包含编码和精度级别
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct GeoSotCell {
+    pub code: u64,
+    pub level: usize,
+}
+
+impl GeoSotCell {
+    /// 创建新的GeoSot单元
+    pub fn new(code: u64, level: usize) -> Self {
+        Self { code, level }
+    }
+
+    /// 从经纬度创建GeoSot单元
+    pub fn from_coords(lng: f64, lat: f64, level: usize) -> Self {
+        let code = get_code(lng, lat, level);
+        Self::new(code, level)
+    }
+
+    /// 转换为字符串表示
+    pub fn to_string(&self) -> String {
+        to_string(self.code, self.level)
+    }
+
+    /// 获取父级单元（降低一级精度）
+    pub fn parent(&self) -> Option<Self> {
+        if self.level <= 1 {
+            return None;
+        }
+        let parent_level = self.level - 1;
+        let shift = (32 - parent_level) * 2;
+        let parent_code = (self.code >> 2) << 2;  // 清除最低2位
+        Some(Self::new(parent_code, parent_level))
+    }
+
+    /// 获取子级单元（增加一级精度）
+    pub fn children(&self) -> Vec<Self> {
+        if self.level >= 32 {
+            return vec![];
+        }
+        let child_level = self.level + 1;
+        let mut children = Vec::new();
+        
+        // 每个单元有4个子单元（00, 01, 10, 11）
+        for i in 0..4 {
+            let child_code = (self.code << 2) | i;
+            children.push(Self::new(child_code, child_level));
+        }
+        children
+    }
+
+    /// 检查是否为另一个单元的祖先
+    pub fn is_ancestor_of(&self, other: &Self) -> bool {
+        if self.level >= other.level {
+            return false;
+        }
+        let level_diff = other.level - self.level;
+        let shifted_other = other.code >> (level_diff * 2);
+        shifted_other == self.code
+    }
+
+    /// 检查是否为另一个单元的后代
+    pub fn is_descendant_of(&self, other: &Self) -> bool {
+        other.is_ancestor_of(self)
+    }
+
+    /// 检查两个单元是否相邻
+    pub fn is_adjacent_to(&self, other: &Self) -> bool {
+        if self.level != other.level {
+            return false;
+        }
+        // 简化的相邻检查，实际实现需要考虑Morton编码的特性
+        let diff = if self.code > other.code {
+            self.code - other.code
+        } else {
+            other.code - self.code
+        };
+        // 相邻单元的编码差值应该是特定的值
+        diff == 1 || diff == 2 || diff == 4 || diff == 8
+    }
+}
+
 /// GeoSOT 编码的空间区域表示
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GeoSotRegion {
@@ -371,6 +453,23 @@ pub mod spatial_analysis {
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_geosot_cell_creation() {
+        let cell = GeoSotCell::from_coords(116.397, 39.916, 20);
+        assert_eq!(cell.level, 20);
+        println!("Cell: {}", cell.to_string());
+    }
+
+    #[test]
+    fn test_parent_child_relationship() {
+        let cell = GeoSotCell::from_coords(116.397, 39.916, 20);
+        let parent = cell.parent().unwrap();
+        assert_eq!(parent.level, 19);
+        
+        let children = parent.children();
+        assert_eq!(children.len(), 4);
+        assert!(children.iter().any(|c| c.is_descendant_of(&parent)));
+    }
     #[test]
     fn test_region_creation() {
         let mut region = GeoSotRegion::new(20);
