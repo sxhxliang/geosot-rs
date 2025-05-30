@@ -1,7 +1,7 @@
 use std::f64;
 
 pub mod utils;
-// pub mod spatial;
+pub mod spatial;
 /// 将十进制经纬度获取 geomgrid 值
 /// 二维莫顿码
 /// Magicbits masks (2D encode)
@@ -30,7 +30,7 @@ pub fn decode_by_geomgrid(code: u64) -> (f64, f64) {
 /// # 参数
 /// - `dec`: 经度或纬度编码
 /// - `precision`: 精度,取值范围 [1~32]
-fn dec2code(dec: f64, precision: usize) -> u32 {
+pub fn dec2code(dec: f64, precision: usize) -> u32 {
     let mut code = 0;
     let val = if dec < 0.0 { -dec } else { dec };
     let g = if dec < 0.0 { 1 } else { 0 };
@@ -56,16 +56,18 @@ fn dec2code(dec: f64, precision: usize) -> u32 {
 /// - `x`: 经度或纬度编码
 ///# Example
 /// ```
+/// use geosot::{dec2code,code2dec};
 /// let lng = 76.233;
 /// println!("{:?}", lng);
+/// let precision = 32;
 /// let lng = dec2code(lng, precision);
 /// println!("{:?}", lng);
 /// println!("{:?}", code2dec(lng));
-/// --------------------------------
-/// 76.233
-/// 639358566
-/// 76.23299994574653
 /// ```
+///  --------------------------------
+/// - 76.233
+/// - 639358566
+/// - 76.23299994574653
 pub fn code2dec(x: u32) -> f64 {
     let g = x >> 31;          // 1b
     let d = (x >> 23) & 0xFF; // 8b
@@ -94,14 +96,14 @@ fn magic_bits(lng: u32, lat: u32) -> u64 {
 /// - `a`: 度分秒按位转换后的值
 /// # Examples
 /// ```
+/// use geosot::{dec2code, split_by_bits};
 /// let lng = 76.233;
 /// let precision = 32;
 /// let lng = dec2code(lng, precision);
-/// split_by_bits(lng)
-/// println!("split_by_bits {}", a);
+/// println!("split_by_bits {}", split_by_bits(lng));
 /// ```
 /// split_by_bits 639358566
-fn split_by_bits(a: u32) -> u64 {
+pub fn split_by_bits(a: u32) -> u64 {
     let mut x = a as u64;
     x = (x | x << 32) & 0x00000000FFFFFFFF;
     x = (x | x << 16) & 0x0000FFFF0000FFFF;
@@ -154,14 +156,16 @@ pub fn to_string(code: u64, level: usize) -> String {
 /// - `m`: geomgrid 值
 /// # Examples
 /// ```
-///  let m: u64 = 339638376531246140;
-///  let (lng, lat) = un_magic_bits(m);
-///  println!("Longitude: {}, Latitude: {}", lng, lat);
-///  println!("Longitude: {}, Latitude: {}", code2dec(lng), code2dec(lat));
-/// --------------------------------------------------
-/// Longitude: 639358566, Latitude: 231900774
-/// Longitude: 76.23299994574653, Latitude: 27.68799994574653
+/// use geosot::{un_magic_bits, code2dec};
+/// let m: u64 = 339638376531246140;
+/// let (lng, lat) = un_magic_bits(m);
+/// println!("Longitude: {}, Latitude: {}", lng, lat);
+/// println!("Longitude: {}, Latitude: {}", code2dec(lng), code2dec(lat));
 /// ```
+/// --------------------------------------------------
+/// - Longitude: 639358566, Latitude: 231900774
+/// - Longitude: 76.23299994574653, Latitude: 27.68799994574653
+/// 
 pub fn un_magic_bits(m: u64) -> (u32, u32) {
     let lng = merge_by_bits(m);
     let lat = merge_by_bits(m >> 1);
