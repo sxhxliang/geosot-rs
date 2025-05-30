@@ -1,6 +1,10 @@
 use std::f64;
 
+pub mod utils;
+// pub mod spatial;
 /// 将十进制经纬度获取 geomgrid 值
+/// 二维莫顿码
+/// Magicbits masks (2D encode)
 /// # 参数
 /// - `x`: 经度
 /// - `y`: 纬度
@@ -10,6 +14,16 @@ pub fn get_code(lng: f64, lat: f64, precision: usize) -> u64 {
     let lat = dec2code(lat, precision);
 
     magic_bits(lng, lat)
+}
+
+/// 将 geomgrid 编码转为经纬度
+/// # 参数
+/// - `code`: geomgrid 编码
+/// # 返回
+/// - `(f64, f64)`: 返回经度和纬度的元组
+pub fn decode_by_geomgrid(code: u64) -> (f64, f64) {
+    let (lng, lat) = un_magic_bits(code);
+    (code2dec(lng), code2dec(lat))
 }
 
 /// 将十进制经纬度值转为经纬度编码
@@ -35,6 +49,38 @@ fn dec2code(dec: f64, precision: usize) -> u32 {
     code
 }
 
+
+///
+/// 将经纬度编码转为十进制经纬度值
+/// # 参数
+/// - `x`: 经度或纬度编码
+///# Example
+/// ```
+/// let lng = 76.233;
+/// println!("{:?}", lng);
+/// let lng = dec2code(lng, precision);
+/// println!("{:?}", lng);
+/// println!("{:?}", code2dec(lng));
+/// --------------------------------
+/// 76.233
+/// 639358566
+/// 76.23299994574653
+/// ```
+pub fn code2dec(x: u32) -> f64 {
+    let g = x >> 31;          // 1b
+    let d = (x >> 23) & 0xFF; // 8b
+    let m = (x >> 17) & 0x3F; // 6b
+    let s = (x >> 11) & 0x3F; // 6b
+    let s11 = x & 0x7FF;      // 11b
+
+    let dec = d as f64 + m as f64 / 60.0 + (s as f64 + s11 as f64 / 2048.0) / 3600.0;
+    if g == 1 {
+        -dec
+    } else {
+        dec
+    }
+}
+
 /// 将经度编码和纬度编码转为 geomgrid 值
 /// # 参数
 /// - `lng`: 经度
@@ -46,6 +92,15 @@ fn magic_bits(lng: u32, lat: u32) -> u64 {
 /// 将 32 位经纬度编码转为 64 位形式
 /// # 参数
 /// - `a`: 度分秒按位转换后的值
+/// # Examples
+/// ```
+/// let lng = 76.233;
+/// let precision = 32;
+/// let lng = dec2code(lng, precision);
+/// split_by_bits(lng)
+/// println!("split_by_bits {}", a);
+/// ```
+/// split_by_bits 639358566
 fn split_by_bits(a: u32) -> u64 {
     let mut x = a as u64;
     x = (x | x << 32) & 0x00000000FFFFFFFF;
@@ -91,4 +146,39 @@ pub fn to_string(code: u64, level: usize) -> String {
         }
     }
     str_out
+}
+
+
+///  根据 geomgrid 分离出经度和纬度的编码
+/// # 参数
+/// - `m`: geomgrid 值
+/// # Examples
+/// ```
+///  let m: u64 = 339638376531246140;
+///  let (lng, lat) = un_magic_bits(m);
+///  println!("Longitude: {}, Latitude: {}", lng, lat);
+///  println!("Longitude: {}, Latitude: {}", code2dec(lng), code2dec(lat));
+/// --------------------------------------------------
+/// Longitude: 639358566, Latitude: 231900774
+/// Longitude: 76.23299994574653, Latitude: 27.68799994574653
+/// ```
+pub fn un_magic_bits(m: u64) -> (u32, u32) {
+    let lng = merge_by_bits(m);
+    let lat = merge_by_bits(m >> 1);
+    (lng, lat)
+}
+
+///
+///  从 geomgrid 值分离其中的单个 32 位编码
+/// # 参数
+/// - `m`: geomgrid 值
+///
+pub fn merge_by_bits(m: u64) -> u32 {
+    let mut x = m & 0x5555555555555555;
+    x = (x ^ (x >> 1)) & 0x3333333333333333;
+    x = (x ^ (x >> 2)) & 0x0F0F0F0F0F0F0F0F;
+    x = (x ^ (x >> 4)) & 0x00FF00FF00FF00FF;
+    x = (x ^ (x >> 8)) & 0x0000FFFF0000FFFF;
+    x = (x ^ (x >> 16)) & 0x00000000FFFFFFFF;
+    x as u32
 }
