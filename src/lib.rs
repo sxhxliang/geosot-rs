@@ -1,7 +1,10 @@
+use pyo3::prelude::*;
+use pyo3::wrap_pymodule;
 use std::f64;
 
 pub mod utils;
 pub mod spatial;
+
 /// 将十进制经纬度获取 geomgrid 值
 /// 二维莫顿码
 /// Magicbits masks (2D encode)
@@ -9,6 +12,7 @@ pub mod spatial;
 /// - `x`: 经度
 /// - `y`: 纬度
 /// - `precision`: 精度,取值范围 [1~32]
+#[pyfunction]
 pub fn get_code(lng: f64, lat: f64, precision: usize) -> u64 {
     let lng = dec2code(lng, precision);
     let lat = dec2code(lat, precision);
@@ -21,6 +25,7 @@ pub fn get_code(lng: f64, lat: f64, precision: usize) -> u64 {
 /// - `code`: geomgrid 编码
 /// # 返回
 /// - `(f64, f64)`: 返回经度和纬度的元组
+#[pyfunction]
 pub fn decode_by_geomgrid(code: u64) -> (f64, f64) {
     let (lng, lat) = un_magic_bits(code);
     (code2dec(lng), code2dec(lat))
@@ -30,9 +35,10 @@ pub fn decode_by_geomgrid(code: u64) -> (f64, f64) {
 /// # 参数
 /// - `dec`: 经度或纬度编码
 /// - `precision`: 精度,取值范围 [1~32]
+#[pyfunction]
 pub fn dec2code(dec: f64, precision: usize) -> u32 {
-    let mut code = 0;
-    let val = if dec < 0.0 { -dec } else { dec };
+    let mut code: u32;
+    let val = dec.abs();
     let g = if dec < 0.0 { 1 } else { 0 };
     let d = val.trunc() as u32;
     let dm = round((val - d as f64) * 60.0, 6);
@@ -43,8 +49,10 @@ pub fn dec2code(dec: f64, precision: usize) -> u32 {
     let s11 = dot_seconds.round() as u32;
 
     code = (g << 31) | (d << 23) | (m << 17) | (s << 11) | s11;
-    code >>= 32 - precision;
-    code <<= 32 - precision;
+    if precision < 32 {
+        code >>= 32 - precision;
+        code <<= 32 - precision;
+    }
 
     code
 }
@@ -68,6 +76,7 @@ pub fn dec2code(dec: f64, precision: usize) -> u32 {
 /// - 76.233
 /// - 639358566
 /// - 76.23299994574653
+#[pyfunction]
 pub fn code2dec(x: u32) -> f64 {
     let g = x >> 31;          // 1b
     let d = (x >> 23) & 0xFF; // 8b
@@ -103,6 +112,7 @@ fn magic_bits(lng: u32, lat: u32) -> u64 {
 /// println!("split_by_bits {}", split_by_bits(lng));
 /// ```
 /// split_by_bits 639358566
+#[pyfunction]
 pub fn split_by_bits(a: u32) -> u64 {
     let mut x = a as u64;
     x = (x | x << 32) & 0x00000000FFFFFFFF;
@@ -131,6 +141,7 @@ fn round(x: f64, y: i32) -> f64 {
 /// # 参数
 /// - `code`: geomgrid 编码
 /// - `level`: 精度等级, 取值范围 [1~32]
+#[pyfunction]
 pub fn to_string(code: u64, level: usize) -> String {
     let mut str_out = String::from("G");
     let level = level - 1;
@@ -165,7 +176,8 @@ pub fn to_string(code: u64, level: usize) -> String {
 /// --------------------------------------------------
 /// - Longitude: 639358566, Latitude: 231900774
 /// - Longitude: 76.23299994574653, Latitude: 27.68799994574653
-/// 
+///
+#[pyfunction]
 pub fn un_magic_bits(m: u64) -> (u32, u32) {
     let lng = merge_by_bits(m);
     let lat = merge_by_bits(m >> 1);
@@ -177,6 +189,7 @@ pub fn un_magic_bits(m: u64) -> (u32, u32) {
 /// # 参数
 /// - `m`: geomgrid 值
 ///
+#[pyfunction]
 pub fn merge_by_bits(m: u64) -> u32 {
     let mut x = m & 0x5555555555555555;
     x = (x ^ (x >> 1)) & 0x3333333333333333;
@@ -185,4 +198,20 @@ pub fn merge_by_bits(m: u64) -> u32 {
     x = (x ^ (x >> 8)) & 0x0000FFFF0000FFFF;
     x = (x ^ (x >> 16)) & 0x00000000FFFFFFFF;
     x as u32
+}
+
+#[pymodule]
+fn geosot(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(get_code, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_by_geomgrid, m)?)?;
+    m.add_function(wrap_pyfunction!(dec2code, m)?)?;
+    m.add_function(wrap_pyfunction!(code2dec, m)?)?;
+    m.add_function(wrap_pyfunction!(split_by_bits, m)?)?;
+    m.add_function(wrap_pyfunction!(to_string, m)?)?;
+    m.add_function(wrap_pyfunction!(un_magic_bits, m)?)?;
+    m.add_function(wrap_pyfunction!(merge_by_bits, m)?)?;
+    m.add_class::<spatial::GeoSotCell>()?;
+    m.add_class::<spatial::GeoSotRegion>()?;
+    m.add_wrapped(wrap_pymodule!(spatial::spatial_analysis))?;
+    Ok(())
 }

@@ -3,5 +3,9 @@ name = "geosot"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "geosot"
+crate-type = ["cdylib"]
+
 [dependencies]
-# bitvec = "*"
+pyo3 = { version = "0.21.2", features = ["extension-module"] }
