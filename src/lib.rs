@@ -201,7 +201,7 @@ pub fn merge_by_bits(m: u64) -> u32 {
 }
 
 #[pymodule]
-fn geosot(_py: Python, m: &PyModule) -> PyResult<()> {
+fn geosot(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_code, m)?)?;
     m.add_function(wrap_pyfunction!(decode_by_geomgrid, m)?)?;
     m.add_function(wrap_pyfunction!(dec2code, m)?)?;

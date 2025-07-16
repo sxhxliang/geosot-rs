@@ -376,7 +376,7 @@ impl GeoSotRegion {
 }
 
 #[pymodule]
-pub fn spatial_analysis(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn spatial_analysis(m: &Bound<'_, PyModule>) -> PyResult<()> {
     /// 计算两个区域的 Jaccard 相似度
     #[pyfn(m)]
     #[pyo3(name = "jaccard_similarity")]
