@@ -1,27 +1,34 @@
+use pyo3::prelude::*;
 use std::collections::{HashSet, BTreeSet};
 use crate::{get_code, decode_by_geomgrid, to_string};
 
 // GeoSot网格单元，包含编码和精度级别
+#[pyclass]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct GeoSotCell {
+    #[pyo3(get, set)]
     pub code: u64,
+    #[pyo3(get, set)]
     pub level: usize,
 }
 
+#[pymethods]
 impl GeoSotCell {
     /// 创建新的GeoSot单元
+    #[new]
     pub fn new(code: u64, level: usize) -> Self {
         Self { code, level }
     }
 
     /// 从经纬度创建GeoSot单元
+    #[staticmethod]
     pub fn from_coords(lng: f64, lat: f64, level: usize) -> Self {
         let code = get_code(lng, lat, level);
         Self::new(code, level)
     }
 
     /// 转换为字符串表示
-    pub fn to_string(&self) -> String {
+    pub fn to_string_py(&self) -> String {
         to_string(self.code, self.level)
     }
 
@@ -31,7 +38,7 @@ impl GeoSotCell {
             return None;
         }
         let parent_level = self.level - 1;
-        let shift = (32 - parent_level) * 2;
+        let _shift = (32 - parent_level) * 2;
         let parent_code = (self.code >> 2) << 2;  // 清除最低2位
         Some(Self::new(parent_code, parent_level))
     }
@@ -43,7 +50,7 @@ impl GeoSotCell {
         }
         let child_level = self.level + 1;
         let mut children = Vec::new();
-        
+
         // 每个单元有4个子单元（00, 01, 10, 11）
         for i in 0..4 {
             let child_code = (self.code << 2) | i;
@@ -84,16 +91,21 @@ impl GeoSotCell {
 }
 
 /// GeoSOT 编码的空间区域表示
+#[pyclass]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GeoSotRegion {
     /// 编码集合，使用 BTreeSet 保持有序
+    #[pyo3(get, set)]
     pub codes: BTreeSet<u64>,
     /// 精度等级
+    #[pyo3(get, set)]
     pub level: usize,
 }
 
+#[pymethods]
 impl GeoSotRegion {
     /// 创建新的 GeoSOT 区域
+    #[new]
     pub fn new(level: usize) -> Self {
         Self {
             codes: BTreeSet::new(),
@@ -102,6 +114,7 @@ impl GeoSotRegion {
     }
 
     /// 从编码向量创建区域
+    #[staticmethod]
     pub fn from_codes(codes: Vec<u64>, level: usize) -> Self {
         let mut region = Self::new(level);
         for code in codes {
@@ -111,9 +124,10 @@ impl GeoSotRegion {
     }
 
     /// 从矩形区域创建 GeoSOT 编码集合
+    #[staticmethod]
     pub fn from_rectangle(min_lng: f64, min_lat: f64, max_lng: f64, max_lat: f64, level: usize) -> Self {
         let mut region = Self::new(level);
-        
+
         // 计算步长 - 使用更精确的步长计算
         let step = match level {
             l if l >= 0 && l <= 9 => 2.0f64.powf(9.0 - l as f64),
@@ -138,7 +152,8 @@ impl GeoSotRegion {
     }
 
     /// 从多边形创建 GeoSOT 编码集合（简化版本，使用包围盒）
-    pub fn from_polygon(points: &[(f64, f64)], level: usize) -> Self {
+    #[staticmethod]
+    pub fn from_polygon(points: Vec<(f64, f64)>, level: usize) -> Self {
         if points.is_empty() {
             return Self::new(level);
         }
@@ -194,15 +209,12 @@ impl GeoSotRegion {
     pub fn to_coordinates(&self) -> Vec<(f64, f64)> {
         self.codes.iter().map(|&code| decode_by_geomgrid(code)).collect()
     }
-}
 
-/// 空间关系计算实现
-impl GeoSotRegion {
     /// 计算两个区域的交集
-    /// 
+    ///
     /// # 参数
     /// * `other` - 另一个区域
-    /// 
+    ///
     /// # 返回
     /// 两个区域的交集
     pub fn intersection(&self, other: &GeoSotRegion) -> GeoSotRegion {
@@ -223,10 +235,10 @@ impl GeoSotRegion {
     }
 
     /// 计算两个区域的并集
-    /// 
+    ///
     /// # 参数
     /// * `other` - 另一个区域
-    /// 
+    ///
     /// # 返回
     /// 两个区域的并集
     pub fn union(&self, other: &GeoSotRegion) -> GeoSotRegion {
@@ -246,10 +258,10 @@ impl GeoSotRegion {
     }
 
     /// 计算两个区域的差集（self - other）
-    /// 
+    ///
     /// # 参数
     /// * `other` - 要减去的区域
-    /// 
+    ///
     /// # 返回
     /// self 中不在 other 中的部分
     pub fn difference(&self, other: &GeoSotRegion) -> GeoSotRegion {
@@ -269,10 +281,10 @@ impl GeoSotRegion {
     }
 
     /// 计算两个区域的对称差集（并集减去交集）
-    /// 
+    ///
     /// # 参数
     /// * `other` - 另一个区域
-    /// 
+    ///
     /// # 返回
     /// 两个区域的对称差集
     pub fn symmetric_difference(&self, other: &GeoSotRegion) -> GeoSotRegion {
@@ -292,10 +304,10 @@ impl GeoSotRegion {
     }
 
     /// 计算区域在指定范围内的补集
-    /// 
+    ///
     /// # 参数
     /// * `universe` - 全集区域
-    /// 
+    ///
     /// # 返回
     /// 当前区域在全集中的补集
     pub fn complement(&self, universe: &GeoSotRegion) -> GeoSotRegion {
@@ -307,10 +319,10 @@ impl GeoSotRegion {
     }
 
     /// 判断当前区域是否是另一个区域的子集
-    /// 
+    ///
     /// # 参数
     /// * `other` - 另一个区域
-    /// 
+    ///
     /// # 返回
     /// 如果当前区域是 other 的子集则返回 true
     pub fn is_subset(&self, other: &GeoSotRegion) -> bool {
@@ -321,10 +333,10 @@ impl GeoSotRegion {
     }
 
     /// 判断当前区域是否是另一个区域的超集
-    /// 
+    ///
     /// # 参数
     /// * `other` - 另一个区域
-    /// 
+    ///
     /// # 返回
     /// 如果当前区域是 other 的超集则返回 true
     pub fn is_superset(&self, other: &GeoSotRegion) -> bool {
@@ -335,10 +347,10 @@ impl GeoSotRegion {
     }
 
     /// 判断两个区域是否相交
-    /// 
+    ///
     /// # 参数
     /// * `other` - 另一个区域
-    /// 
+    ///
     /// # 返回
     /// 如果两个区域有交集则返回 true
     pub fn intersects(&self, other: &GeoSotRegion) -> bool {
@@ -349,10 +361,10 @@ impl GeoSotRegion {
     }
 
     /// 判断两个区域是否不相交
-    /// 
+    ///
     /// # 参数
     /// * `other` - 另一个区域
-    /// 
+    ///
     /// # 返回
     /// 如果两个区域没有交集则返回 true
     pub fn is_disjoint(&self, other: &GeoSotRegion) -> bool {
@@ -363,19 +375,12 @@ impl GeoSotRegion {
     }
 }
 
-/// 空间关系分析函数
-pub mod spatial_analysis {
-    use super::*;
-
+#[pymodule]
+pub fn spatial_analysis(_py: Python, m: &PyModule) -> PyResult<()> {
     /// 计算两个区域的 Jaccard 相似度
-    /// 
-    /// # 参数
-    /// * `region1` - 第一个区域
-    /// * `region2` - 第二个区域
-    /// 
-    /// # 返回
-    /// Jaccard 相似度 (0.0 到 1.0)
-    pub fn jaccard_similarity(region1: &GeoSotRegion, region2: &GeoSotRegion) -> f64 {
+    #[pyfn(m)]
+    #[pyo3(name = "jaccard_similarity")]
+    fn jaccard_similarity_py(region1: &GeoSotRegion, region2: &GeoSotRegion) -> f64 {
         if region1.level != region2.level {
             return 0.0;
         }
@@ -391,14 +396,9 @@ pub mod spatial_analysis {
     }
 
     /// 计算两个区域的重叠率
-    /// 
-    /// # 参数
-    /// * `region1` - 第一个区域
-    /// * `region2` - 第二个区域
-    /// 
-    /// # 返回
-    /// 重叠率 (region1与region2交集 / region1的大小)
-    pub fn overlap_ratio(region1: &GeoSotRegion, region2: &GeoSotRegion) -> f64 {
+    #[pyfn(m)]
+    #[pyo3(name = "overlap_ratio")]
+    fn overlap_ratio_py(region1: &GeoSotRegion, region2: &GeoSotRegion) -> f64 {
         if region1.level != region2.level || region1.is_empty() {
             return 0.0;
         }
@@ -408,14 +408,9 @@ pub mod spatial_analysis {
     }
 
     /// 计算区域的紧密度（连通性度量）
-    /// 简化版本：计算具有相邻编码的比例
-    /// 
-    /// # 参数
-    /// * `region` - 要分析的区域
-    /// 
-    /// # 返回
-    /// 紧密度值 (0.0 到 1.0)
-    pub fn compactness(region: &GeoSotRegion) -> f64 {
+    #[pyfn(m)]
+    #[pyo3(name = "compactness")]
+    fn compactness_py(region: &GeoSotRegion) -> f64 {
         if region.size() <= 1 {
             return 1.0;
         }
@@ -439,14 +434,17 @@ pub mod spatial_analysis {
         }
     }
 
-    /// 简化的相邻编码判断函数
-    /// 实际实现中应该根据 GeoSOT 编码的空间结构来判断
-    fn are_adjacent_codes(code1: u64, code2: u64, _level: usize) -> bool {
-        // 这里是一个简化的实现，实际应该根据莫顿码的性质来判断相邻性
-        let diff = if code1 > code2 { code1 - code2 } else { code2 - code1 };
-        // 相邻的莫顿码通常差值较小
-        diff <= 4 // 简化判断
-    }
+    Ok(())
+}
+
+
+/// 简化的相邻编码判断函数
+/// 实际实现中应该根据 GeoSOT 编码的空间结构来判断
+fn are_adjacent_codes(code1: u64, code2: u64, _level: usize) -> bool {
+    // 这里是一个简化的实现，实际应该根据莫顿码的性质来判断相邻性
+    let diff = if code1 > code2 { code1 - code2 } else { code2 - code1 };
+    // 相邻的莫顿码通常差值较小
+    diff <= 4 // 简化判断
 }
 
 #[cfg(test)]
