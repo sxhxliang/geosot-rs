@@ -2,7 +2,7 @@
 #[cfg(test)]
 mod tests {
     use geosot::spatial::{GeoSotRegion, spatial_analysis};
-    use geosot::{get_code, to_string};
+    use geosot::get_code;
 
     #[test]
     fn test_basic_spatial_operations() {
@@ -178,7 +178,7 @@ mod tests {
             (116.1, 39.1),
             (115.9, 39.1),
         ];
-        let polygon_region = GeoSotRegion::from_polygon(&polygon_points, level);
+        let polygon_region = GeoSotRegion::from_polygon(polygon_points, level);
         println!("多边形区域大小: {}", polygon_region.size());
         assert!(polygon_region.size() > 0);
         

@@ -212,6 +212,6 @@ fn geosot(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(merge_by_bits, m)?)?;
     m.add_class::<spatial::GeoSotCell>()?;
     m.add_class::<spatial::GeoSotRegion>()?;
-    m.add_wrapped(wrap_pymodule!(spatial::spatial_analysis))?;
+    m.add_wrapped(wrap_pymodule!(spatial::spatial_analysis_py))?;
     Ok(())
 }

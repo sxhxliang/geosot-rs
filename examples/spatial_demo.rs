@@ -6,7 +6,6 @@ fn main() {
 
     // 创建测试区域
     let level = 20;
-    use geosot::spatial::GeoSotRegion;
 
     // 创建矩形区域
     let region = GeoSotRegion::from_rectangle(
@@ -130,7 +129,7 @@ fn main() {
         (116.2, 39.2),
         (116.0, 39.2),
     ];
-    let polygon_region = GeoSotRegion::from_polygon(&polygon_points, 18);
+    let polygon_region = GeoSotRegion::from_polygon(polygon_points, 18);
     println!("多边形区域包含 {} 个网格", polygon_region.size());
     println!();
 
